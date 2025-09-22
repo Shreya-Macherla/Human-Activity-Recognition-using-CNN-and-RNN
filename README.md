@@ -1,4 +1,4 @@
-# Human-Activity-Recognition-using-CNN-and-RNN
+# Human-Activity-Recognition
 
 •	Applied data science techniques to solve business-critical problems on Human Activity Recognition(HAR) using Neural Networks. Brainstormed with data personnel to define data modelling standards and architect database solutions. Created data models for HAR and developed Apache Spark ETL pipelines to efficiently ingest data from multiple disparate sources to HDFS cluster using Sqoop, Flume. Managed Big Data on a cluster with HDFS and MapReduce, used Apache Ambari for managing and monitoring HDFS. Provided analytical querying capabilities via Cassandra, Hive, HBase, and Presto for various business strategies.
 

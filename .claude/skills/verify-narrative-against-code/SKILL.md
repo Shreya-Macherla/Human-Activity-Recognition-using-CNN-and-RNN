@@ -1,48 +1,56 @@
 ---
 name: verify-narrative-against-code
-description: Load before editing README.md, har_analysis.py, or the training notebook, or any claim about model architecture/accuracy in this repo. Trigger on keywords — CNN, RNN, LSTM, Conv1D, accuracy, Apache Spark, HDFS.
+description: Load before editing README.md, har_analysis.py, the notebook, or any claim about model architecture/accuracy in this repo. Trigger on keywords — CNN, RNN, LSTM, accuracy, subject-independent, Apache Spark, HDFS, simulated.
 ---
 
-# har_analysis.py fabricates every result; the real notebook doesn't match the repo's own name
+# Every number in this repo must trace to a real training run
 
-Verified directly (not from an unverified claim): `har_analysis.py`'s docstring says "Simulates
-training." It never loads data or trains a model — `numpy.random` generates the training curves,
-confusion matrix, and per-model accuracy numbers (95.6%, 93.4%, etc.) that the README embeds as
-`outputs/01_model_performance.png`.
+## History (resolved — do not re-fix)
 
-Separately, the real notebook (`HAR_Neural Sample code.ipynb`) does load the actual UCI-HAR
-dataset and does train real models — but:
+This repo previously had two layers of fabrication, both repaired:
+1. `har_analysis.py` was a chart generator that simulated all results with
+   `np.random` (95.6% "CNN-LSTM accuracy" that was never trained). It is now a
+   real training script (CNN / LSTM / CNN-LSTM on raw UCI-HAR inertial signals,
+   seeded, with checkpoint/resume).
+2. The README claimed CNN/LSTM architectures and an Apache Spark/HDFS pipeline
+   that didn't exist. The CNN/LSTM/CNN-LSTM models now genuinely exist in
+   `har_analysis.py`; the Spark/HDFS pipeline claims stay removed — never
+   re-add them.
 
-```bash
-grep -o "Conv1D\|Conv2D\|LSTM\|GRU\|Dense(" "HAR_Neural Sample code.ipynb" | sort | uniq -c
-#   16 Dense(
-#    1 GRU        (one incidental mention, not an actual layer in the trained models)
-```
+## Current verified numbers (independent re-run, TF 2.21, seed 42, 18 epochs)
 
-All three trained models are plain `Dense` feedforward networks. There is no `Conv1D` and no
-`LSTM` anywhere, despite the repo name, README architecture diagram, and Tools badges all
-claiming a CNN+LSTM pipeline with an Apache Spark/HDFS/Sqoop/Flume/Hive/Cassandra stack that
-appears nowhere in any file in this repo.
+| Model | Test accuracy | Source |
+|---|---|---|
+| CNN (raw signals) | 90.7% | `outputs/model_results.json` + `CNN_history.json` |
+| CNN-LSTM (raw signals) | 90.7% | same |
+| LSTM (raw signals) | 90.6% | same |
+| Dense NN baseline (561 features) | 96.0% | `HAR_Neural Sample code.ipynb`, cell 58 |
 
-The real notebook's genuine result — 96.0% test accuracy from a well-executed comparison of three
-dense architectures, with real EDA, PCA, and per-class evaluation — is solid and defensible on
-its own. It doesn't need the simulated chart or the CNN/LSTM claim to be a good result.
+Evaluation is the standard subject-independent UCI-HAR split. Rules of thumb:
+- Numbers drift ~±1pp across TensorFlow versions even with the seed fixed. If a
+  re-run changes them, update README, `outputs/model_results.json`, the history
+  files, and this table in the same commit.
+- The three deep models are statistically tied — never claim one architecture
+  "wins" at a sub-1pp margin.
+- The 96.0% belongs to the feature-engineered dense baseline (notebook), NOT to
+  the CNN/LSTM raw-signal models. Resume/profile wording must not attach 96% to
+  the deep models.
+- Sitting↔Standing confusion (recalls ~0.85/0.78) is the known weakness — it's a
+  documented sensor limitation, keep it visible rather than hiding it.
 
-## Before touching this repo again
+## Rules when editing
 
-1. Replace `outputs/01_model_performance.png` and `02_sensor_patterns.png` with real outputs
-   saved from the notebook (it already produces training curves, a confusion matrix heatmap, and
-   classification reports).
-2. Either add real `Conv1D`/`LSTM` models to the notebook so the repo matches its own name, or
-   rename the repo/README/architecture diagram to describe what's actually there (a dense-network
-   comparison).
-3. Reconcile the accuracy number everywhere it appears — resume, README (95.6% simulated), and
-   notebook (96.0% real) currently disagree; use the real, traceable 96.0% figure everywhere.
-4. Drop the Apache Spark/HDFS/Sqoop/Flume/Hive/Zeppelin/Cassandra "Pipeline Stack" badges — none
-   of that appears in any code file here.
+1. New accuracy claim → run `har_analysis.py` (or the notebook) first, copy the
+   number from its output, and commit the regenerated
+   `model_results.json`/history artifacts in the same commit.
+2. `outputs/*.weights.h5`, `*_preds.npy`, `*_acc.json`, and the dataset dir are
+   gitignored — don't force-add them.
+3. Chart 2 (`02_sensor_patterns.png`) now plots REAL test-set windows — if you
+   touch `plot_sensor_patterns`, keep it reading from the loaded dataset, never
+   synthetic waveforms.
 
 ## When NOT to use this skill
 
-This repo's real notebook is legitimate work worth preserving as-is technically — this skill is
-about the gap between the marketing layer (README, badges, `har_analysis.py`) and what the
-notebook actually does, not about the modeling approach itself.
+Non-metric edits (typos, structure lists, .gitignore) don't need the full trace
+check — but any edit that adds, changes, or rephrases a performance or
+architecture claim does.

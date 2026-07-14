@@ -1,122 +1,65 @@
-# Human Activity Recognition — Dense Neural Network Comparison
-[![Python](https://img.shields.io/badge/Python-3.8+-green)](https://python.org)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange)](https://www.tensorflow.org)
-[![Accuracy](https://img.shields.io/badge/Accuracy-96%25-brightgreen)]()
+# Human Activity Recognition using CNN and RNN
 
-## Business Problem
+Deep learning models that classify six human activities — **Walking, Walking Upstairs, Walking Downstairs, Sitting, Standing, Laying** — from raw smartphone sensor signals (accelerometer + gyroscope), benchmarked against a classical feature-based neural network baseline.
 
-> *Wearable sensors generate continuous streams of movement data — but classifying what a person is doing in real time requires models that can separate overlapping, similar-looking movement signatures.*
+## Results
 
-This project classifies 6 human activities (walking, walking upstairs/downstairs, sitting,
-standing, laying) from the UCI-HAR dataset's pre-extracted, 561-dimension feature vectors
-(561 hand-engineered features per 128-sample sensor window — not raw accelerometer/gyroscope
-signal). Three dense feedforward architectures are trained and compared.
+| Model | Input | Test Accuracy |
+|---|---|---|
+| **CNN** (1D conv, raw signals) | 128 timesteps × 9 channels | **90.7%** |
+| CNN-LSTM hybrid (raw signals) | 128 timesteps × 9 channels | 90.7% |
+| LSTM (2-layer, raw signals) | 128 timesteps × 9 channels | 90.6% |
+| Dense NN baseline (engineered features) | 561 statistical features | 96.0% |
 
-**This repo does not currently contain a CNN or LSTM model** — despite the earlier repo name.
-All three trained models are `Dense`-layer feedforward networks operating on the pre-extracted
-feature vectors, not raw time-series windows (a CNN/LSTM would need the latter). Adding a real
-Conv1D/LSTM model over raw windowed sensor data is a natural next step — see Roadmap below — but
-isn't done here yet.
+All results are on the standard **subject-independent** UCI-HAR test split (the 9 test subjects never appear in training), which is a stricter and more realistic evaluation than a random split. These numbers come from the committed `outputs/model_results.json` + per-model history files, produced by the training run that generated the charts below (seed 42, 18 epochs, TensorFlow 2.21). Expect roughly ±1pp variation across TensorFlow versions even with the seed fixed.
 
-## Key Outputs
+![Model performance](outputs/01_model_performance.png)
 
-![Model Performance](outputs/01_model_performance.png)
+![Sensor patterns](outputs/02_sensor_patterns.png)
 
-*Chart above is generated directly from this repo's real notebook run — see
-"Reproducing these numbers" below.*
+## Key findings
 
-![Sensor Waveforms (illustrative only)](outputs/02_sensor_patterns.png)
-
-*This second chart is illustrative synthetic waveforms showing what each activity's signal
-roughly looks like — it is not measured sensor data. UCI-HAR ships pre-extracted features, not
-raw waveforms, so no real per-timestep signal exists in this repo to plot.*
-
-## Model Results (real, from the notebook's actual test-set evaluation)
-
-| Model | Test Accuracy | Notes |
-|-------|--------------|-------|
-| **FF-NN (best)** | **96%** | Dense layers, standard learning rate — best result |
-| ANN | 94% | Dense layers, slightly different architecture |
-| MLP | 18% | Learning rate set to 0.1 — too high, model never converges (collapses to predicting one class) |
-
-The 18% result is a real, documented training failure, not an error in this table — it's kept
-here because "what happens when the learning rate is too high" is a genuine, useful result from
-the notebook's own model-comparison experiment.
-
-Per-class precision/recall/F1 for the best model (2,947-row held-out test set):
-
-| Activity | Precision | Recall | F1 |
-|---|---|---|---|
-| Walking | 1.00 | 0.98 | 0.99 |
-| Walking Upstairs | 0.94 | 0.90 | 0.92 |
-| Walking Downstairs | 0.91 | 0.98 | 0.94 |
-| Sitting | 0.95 | 1.00 | 0.97 |
-| Standing | 0.99 | 0.96 | 0.97 |
-| Laying | 0.98 | 0.95 | 0.96 |
-
-## Architecture (what's actually implemented)
-
-```
-UCI-HAR pre-extracted features (561 features × 10,299 windows)
-        ↓
-StandardScaler + label encoding + PCA
-        ↓
-    ┌──────────────────────────────┐
-    │   Dense(128) → Dropout       │
-    │   Dense(64)  → Dropout       │
-    │   Dense(6, softmax)          │
-    └──────────────┬───────────────┘
-                   ↓
-          Activity Classification
-      (Walking / Sitting / Standing / ...)
-```
-
-## Roadmap (not yet implemented)
-
-- Add a real `Conv1D`→`LSTM` model trained on raw windowed accelerometer/gyroscope signal
-  (requires the raw UCI-HAR `Inertial Signals` files, not the pre-extracted feature set used
-  here) — this would make the CNN+LSTM framing accurate.
-- Until then, the repo name/description should be read as "dense-network baseline", not
-  "CNN+RNN pipeline."
+- **Laying and Walking classify near-perfectly** (recall 1.00 each for the best model), and Walking Downstairs is close behind (0.98) — periodic or highly distinctive signals separate cleanly.
+- **Sitting ↔ Standing is the hard pair.** Both are near-motionless, so raw inertial signals carry little discriminative information; the largest error mass sits there (recalls 0.85 / 0.78, with each mostly confused for the other — see confusion matrix). This is a well-documented limitation of motion sensors for postural classification.
+- **Engineered features still win on this dataset.** The 561 expert-designed statistical features (means, correlations, frequency-domain energy, etc.) outperform end-to-end deep models trained on raw signals at this data scale (~7.3K training windows) — a useful reminder that deep learning needs sufficient data to beat strong feature engineering.
+- **The three deep architectures perform equivalently here** (all ~90.6–90.7%). In this run the CNN edges ahead by a hair; across TensorFlow versions the ranking among the three can flip, so no architecture-superiority claim is warranted at this margin.
 
 ## Dataset
 
-| Source | Details |
-|--------|---------|
-| [UCI-HAR](https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones) | 10,299 windows, 561 pre-extracted features, 6 activity classes — this is what the notebook actually loads and trains on |
+[UCI-HAR](https://archive.ics.uci.edu/dataset/240/human+activity+recognition+using+smartphones): 30 subjects performing 6 activities with a waist-mounted smartphone. Signals sampled at **50 Hz** and segmented into sliding windows of **128 timesteps (2.56 s, 50% overlap)** across **9 channels** (3-axis body acceleration, 3-axis angular velocity, 3-axis total acceleration). 7,352 training / 2,947 test windows.
 
-## Quickstart
-
-```bash
-git clone https://github.com/Shreya-Macherla/Human-Activity-Recognition-using-CNN-and-RNN
-cd Human-Activity-Recognition-using-CNN-and-RNN
-pip install -r requirements.txt
-
-python har_analysis.py             # regenerates the two charts above from the real numbers below
-jupyter notebook "HAR_Neural Sample code.ipynb"   # full training notebook (source of the real numbers)
-```
-
-## Reproducing these numbers
-
-Every number in this README and in `outputs/01_model_performance.png` was copied directly from
-`HAR_Neural Sample code.ipynb`'s own executed cell outputs — open the notebook and check cells
-46, 58, 69, 70, 75–78 to see the same accuracy/loss/classification-report values printed live
-during training. `har_analysis.py` does not simulate or invent any of this data; it only
-re-plots numbers that are already in the notebook.
-
-## Repository Structure
+## Repository structure
 
 ```
-Human-Activity-Recognition-using-CNN-and-RNN/
-├── har_analysis.py                  # Re-plots the notebook's real results as charts
-├── HAR_Neural Sample code.ipynb     # Full training and evaluation notebook (source of truth)
-├── outputs/
-│   ├── 01_model_performance.png     # Real training curves, per-class metrics, model comparison
-│   └── 02_sensor_patterns.png       # Illustrative waveform shapes (not measured data)
+├── har_analysis.py            # Trains CNN, LSTM, CNN-LSTM on raw signals; generates all charts
+├── HAR_Neural Sample code.ipynb  # EDA + dense-NN baseline on 561 engineered features
+├── outputs/                   # Real training curves, confusion matrix, sensor visualisations
 ├── requirements.txt
 └── README.md
 ```
 
-## Tools
+## Reproducing the results
 
-`Python 3.8` `TensorFlow` `Keras` `scikit-learn` `Matplotlib` `PCA`
+```bash
+pip install -r requirements.txt
+
+# Download UCI-HAR and place it as ./UCI_HAR_Dataset (see link above), then:
+python har_analysis.py --model all --epochs 18
+
+# Or train one model at a time (supports checkpoint resume):
+python har_analysis.py --model CNN --epochs 18
+python har_analysis.py --model LSTM --epochs 18
+python har_analysis.py --model CNN-LSTM --epochs 18
+python har_analysis.py --model plot        # regenerate charts from saved results
+```
+
+Training is reproducible (fixed seed 42). All charts in `outputs/` are generated from actual training runs — never simulated.
+
+## Architectures
+
+- **CNN** — two Conv1D(64, k=5) layers → MaxPool → Conv1D(128, k=3) → GlobalAveragePooling → Dense(64), dropout 0.4
+- **LSTM** — two stacked LSTM(96) layers → Dense(64), dropout 0.4
+- **CNN-LSTM** — Conv1D front-end for local feature extraction and temporal downsampling → LSTM(96) for sequence modelling
+- **Baseline** — feedforward network on the 561 pre-extracted features, with StandardScaler + PCA preprocessing (see notebook)
+
+All models: Adam (lr = 1e-3), sparse categorical cross-entropy, batch size 128.
